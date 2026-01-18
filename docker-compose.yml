@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  crc-worker:
+    build: .
+    command: python worker.py
+    volumes:
+      - .:/usr/src/app
+    environment:
+      - ACI_USERNAME=${ACI_USERNAME}
+      - ACI_PASSWORD=${ACI_PASSWORD}
+      - TEMPORAL_HOST=temporal:7233
+    networks:
+      - temporal-network
+
+networks:
+  temporal-network:
+    external: true
