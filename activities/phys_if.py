@@ -1,0 +1,46 @@
+from dataclasses import dataclass
+from temporalio import activity
+
+from .session import session
+
+
+@dataclass
+class PhysIfInput:
+    ip: str
+
+
+@dataclass
+class PhysIfOutput:
+    interfaces: dict
+    ip: str
+
+
+@activity.defn
+async def get_phys_if_activity(input: PhysIfInput) -> PhysIfOutput:
+    url = f"https://{input.ip}/api/node/class/l1PhysIf.json?rsp-subtree=full&rsp-subtree-class=rmonEtherStats"
+
+    response = session.get(url)
+    response.raise_for_status()
+
+    data = response.json()
+    interfaces = {}
+
+    for item in data.get("imdata", []):
+        phys_if = item.get("l1PhysIf", {})
+        attrs = phys_if.get("attributes", {})
+        dn = attrs.get("dn", "")
+        iface_id = attrs.get("id", "")
+
+        crc_errors = 0
+        children = phys_if.get("children", [])
+        for child in children:
+            rmon = child.get("rmonEtherStats", {})
+            rmon_attrs = rmon.get("attributes", {})
+            crc_errors = rmon_attrs.get("cRCAlignErrors", 0)
+
+        interfaces[iface_id] = {
+            "dn1": dn,
+            "crc_errors": crc_errors
+        }
+
+    return PhysIfOutput(interfaces=interfaces, ip=input.ip)
