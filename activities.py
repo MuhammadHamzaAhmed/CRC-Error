@@ -6,6 +6,9 @@ from temporalio import activity
 
 requests.packages.urllib3.disable_warnings()
 
+session = requests.Session()
+session.verify = False
+
 
 @dataclass
 class LoginInput:
@@ -13,33 +16,24 @@ class LoginInput:
 
 
 @dataclass
-class LoginOutput:
-    token: str
-    ip: str
-
-
-@dataclass
 class PhysIfInput:
     ip: str
-    token: str
 
 
 @dataclass
 class PhysIfOutput:
     interfaces: dict
     ip: str
-    token: str
 
 
 @dataclass
 class IngrTotalInput:
     ip: str
-    token: str
     interfaces: dict
 
 
 @activity.defn
-async def login_activity(input: LoginInput) -> LoginOutput:
+async def login_activity(input: LoginInput) -> str:
     url = f"https://{input.ip}/api/aaaLogin.json"
     username = os.environ.get("ACI_USERNAME")
     password = os.environ.get("ACI_PASSWORD")
@@ -53,21 +47,18 @@ async def login_activity(input: LoginInput) -> LoginOutput:
         }
     }
 
-    response = requests.post(url, json=payload, verify=False)
-    response.raise_for_status()
+    response = session.post(url, json=payload)
+    if response.status_code != 200:
+        raise Exception(f"Login failed with status code: {response.status_code}")
 
-    data = response.json()
-    token = data["imdata"][0]["aaaLogin"]["attributes"]["token"]
-
-    return LoginOutput(token=token, ip=input.ip)
+    return input.ip
 
 
 @activity.defn
 async def get_phys_if_activity(input: PhysIfInput) -> PhysIfOutput:
     url = f"https://{input.ip}/api/node/class/l1PhysIf.json?rsp-subtree=full&rsp-subtree-class=rmonEtherStats"
 
-    cookies = {"APIC-cookie": input.token}
-    response = requests.get(url, cookies=cookies, verify=False)
+    response = session.get(url)
     response.raise_for_status()
 
     data = response.json()
@@ -91,15 +82,14 @@ async def get_phys_if_activity(input: PhysIfInput) -> PhysIfOutput:
             "crc_errors": crc_errors
         }
 
-    return PhysIfOutput(interfaces=interfaces, ip=input.ip, token=input.token)
+    return PhysIfOutput(interfaces=interfaces, ip=input.ip)
 
 
 @activity.defn
 async def get_ingr_total_activity(input: IngrTotalInput) -> dict:
     url = f"https://{input.ip}/api/class/eqptIngrTotal15min.json"
 
-    cookies = {"APIC-cookie": input.token}
-    response = requests.get(url, cookies=cookies, verify=False)
+    response = session.get(url)
     response.raise_for_status()
 
     data = response.json()

@@ -16,7 +16,7 @@ with workflow.unsafe.imports_passed_through():
 class CrcErrorWorkflow:
     @workflow.run
     async def run(self, ip: str) -> dict:
-        login_result = await workflow.execute_activity(
+        ip = await workflow.execute_activity(
             login_activity,
             LoginInput(ip=ip),
             start_to_close_timeout=timedelta(seconds=30),
@@ -24,7 +24,7 @@ class CrcErrorWorkflow:
 
         phys_if_result = await workflow.execute_activity(
             get_phys_if_activity,
-            PhysIfInput(ip=login_result.ip, token=login_result.token),
+            PhysIfInput(ip=ip),
             start_to_close_timeout=timedelta(seconds=60),
         )
 
@@ -32,7 +32,6 @@ class CrcErrorWorkflow:
             get_ingr_total_activity,
             IngrTotalInput(
                 ip=phys_if_result.ip,
-                token=phys_if_result.token,
                 interfaces=phys_if_result.interfaces,
             ),
             start_to_close_timeout=timedelta(seconds=60),
