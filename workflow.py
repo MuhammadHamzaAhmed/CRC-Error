@@ -9,16 +9,17 @@ with workflow.unsafe.imports_passed_through():
         LoginInput,
         PhysIfInput,
         IngrTotalInput,
+        WorkflowInput,
     )
 
 
 @workflow.defn
 class CrcErrorWorkflow:
     @workflow.run
-    async def run(self, ip: str) -> dict:
+    async def run(self, input: WorkflowInput) -> dict:
         ip = await workflow.execute_activity(
             login_activity,
-            LoginInput(ip=ip),
+            LoginInput(ip=input.ip),
             start_to_close_timeout=timedelta(seconds=30),
         )
 
