@@ -7,17 +7,19 @@ from .session import session
 @dataclass
 class PhysIfInput:
     ip: str
+    protocol: str = "https"
 
 
 @dataclass
 class PhysIfOutput:
     interfaces: dict
     ip: str
+    protocol: str
 
 
 @activity.defn
 async def get_phys_if_activity(input: PhysIfInput) -> PhysIfOutput:
-    url = f"http://{input.ip}/api/node/class/l1PhysIf.json?rsp-subtree=full&rsp-subtree-class=rmonEtherStats"
+    url = f"{input.protocol}://{input.ip}/api/node/class/l1PhysIf.json?rsp-subtree=full&rsp-subtree-class=rmonEtherStats"
 
     response = session.get(url)
     response.raise_for_status()
@@ -43,4 +45,4 @@ async def get_phys_if_activity(input: PhysIfInput) -> PhysIfOutput:
             "crc_errors": crc_errors
         }
 
-    return PhysIfOutput(interfaces=interfaces, ip=input.ip)
+    return PhysIfOutput(interfaces=interfaces, ip=input.ip, protocol=input.protocol)
