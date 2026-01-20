@@ -13,7 +13,7 @@ class IngrTotalInput:
 
 @activity.defn
 async def get_ingr_total_activity(input: IngrTotalInput) -> dict:
-    url = f"https://{input.ip}/api/class/eqptIngrTotal15min.json"
+    url = f"http://{input.ip}/api/class/eqptIngrTotal15min.json"
 
     response = session.get(url)
     response.raise_for_status()

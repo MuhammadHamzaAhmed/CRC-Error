@@ -12,9 +12,9 @@ class LoginInput:
 
 @activity.defn
 async def login_activity(input: LoginInput) -> str:
-    url = f"https://{input.ip}/api/aaaLogin.json"
-    username = os.environ.get("ACI_USERNAME")
-    password = os.environ.get("ACI_PASSWORD")
+    url = f"http://{input.ip}/api/aaaLogin.json"
+    username = os.environ.get("ACI_USERNAME") or 'test'
+    password = os.environ.get("ACI_PASSWORD") or 'test'
 
     payload = {
         "aaaUser": {

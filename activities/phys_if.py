@@ -17,7 +17,7 @@ class PhysIfOutput:
 
 @activity.defn
 async def get_phys_if_activity(input: PhysIfInput) -> PhysIfOutput:
-    url = f"https://{input.ip}/api/node/class/l1PhysIf.json?rsp-subtree=full&rsp-subtree-class=rmonEtherStats"
+    url = f"http://{input.ip}/api/node/class/l1PhysIf.json?rsp-subtree=full&rsp-subtree-class=rmonEtherStats"
 
     response = session.get(url)
     response.raise_for_status()
