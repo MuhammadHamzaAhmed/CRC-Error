@@ -11,24 +11,32 @@ with workflow.unsafe.imports_passed_through():
         IngrTotalInput,
         WorkflowInput,
     )
+    from activities.logger import workflow_logger as logger
 
 
 @workflow.defn
 class CrcErrorWorkflow:
     @workflow.run
     async def run(self, input: WorkflowInput) -> dict:
+        logger.info(f"Starting CrcErrorWorkflow for {input.ip} using {input.protocol}")
+
+        logger.info("Executing login activity...")
         login_result = await workflow.execute_activity(
             login_activity,
             LoginInput(ip=input.ip, protocol=input.protocol),
             start_to_close_timeout=timedelta(seconds=30),
         )
+        logger.info("Login activity completed")
 
+        logger.info("Executing physical interface activity...")
         phys_if_result = await workflow.execute_activity(
             get_phys_if_activity,
             PhysIfInput(ip=login_result.ip, protocol=login_result.protocol),
             start_to_close_timeout=timedelta(seconds=60),
         )
+        logger.info(f"Physical interface activity completed. Found {len(phys_if_result.interfaces)} interfaces")
 
+        logger.info("Executing ingress total activity...")
         result = await workflow.execute_activity(
             get_ingr_total_activity,
             IngrTotalInput(
@@ -38,5 +46,7 @@ class CrcErrorWorkflow:
             ),
             start_to_close_timeout=timedelta(seconds=60),
         )
+        logger.info("Ingress total activity completed")
 
+        logger.info(f"Workflow completed successfully. Result contains {len(result)} interfaces")
         return result
