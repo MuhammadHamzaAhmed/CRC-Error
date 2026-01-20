@@ -36,6 +36,7 @@ def start_workflow():
     Request body:
     {
         "ip": "192.168.1.1",
+        "protocol": "http",  // optional, defaults to "https"
         "workflow_id": "optional-custom-id"
     }
     """
@@ -45,13 +46,14 @@ def start_workflow():
         return jsonify({"error": "Missing 'ip' in request body"}), 400
 
     ip = data["ip"]
+    protocol = data.get("protocol", "https")
     workflow_id = data.get("workflow_id", f"crc-error-{uuid.uuid4()}")
 
     async def _start():
         client = await get_client()
         handle = await client.start_workflow(
             CrcErrorWorkflow.run,
-            WorkflowInput(ip=ip),
+            WorkflowInput(ip=ip, protocol=protocol),
             id=workflow_id,
             task_queue=TEMPORAL_QUEUE,
         )
@@ -62,7 +64,7 @@ def start_workflow():
         return jsonify({
             "message": "Workflow started",
             "workflow_id": wf_id,
-            "input": {"ip": ip}
+            "input": {"ip": ip, "protocol": protocol}
         }), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
