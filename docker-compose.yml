@@ -1,17 +1,44 @@
 version: '3.8'
 
 services:
+  mongodb:
+    image: mongo:7.0
+    container_name: crc-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=crc_error
+    networks:
+      - temporal-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   crc-worker:
     build: .
     command: python worker.py
     volumes:
       - .:/usr/src/app
+      - ./logs:/usr/src/app/logs
     environment:
       - ACI_USERNAME=${ACI_USERNAME}
       - ACI_PASSWORD=${ACI_PASSWORD}
       - TEMPORAL_HOST=temporal:7233
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DB=crc_error
+      - TZ=${TZ:-Asia/Riyadh}
+    depends_on:
+      mongodb:
+        condition: service_healthy
     networks:
       - temporal-network
+
+volumes:
+  mongodb_data:
 
 networks:
   temporal-network:
