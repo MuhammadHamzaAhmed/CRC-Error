@@ -58,4 +58,8 @@ def get_logger(name: str) -> logging.Logger:
 login_logger = get_logger("login_activity")
 phys_if_logger = get_logger("phys_if_activity")
 ingr_total_logger = get_logger("ingr_total_activity")
+mongodb_logger = get_logger("mongodb")
+delta_logger = get_logger("delta_activity")
+incident_logger = get_logger("incident_activity")
+store_history_logger = get_logger("store_history_activity")
 workflow_logger = get_logger("workflow")
