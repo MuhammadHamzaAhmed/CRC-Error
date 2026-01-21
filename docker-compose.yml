@@ -11,6 +11,7 @@ services:
     environment:
       - MONGO_INITDB_DATABASE=crc_error
     networks:
+      - crc-network
       - temporal-network
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
@@ -35,11 +36,14 @@ services:
       mongodb:
         condition: service_healthy
     networks:
+      - crc-network
       - temporal-network
 
 volumes:
   mongodb_data:
 
 networks:
+  crc-network:
+    driver: bridge
   temporal-network:
     external: true
