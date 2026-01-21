@@ -113,9 +113,13 @@ class CrcErrorWorkflow:
             retry_policy=NO_RETRY,
         )
 
-        # Final output - incidents only, no analytics
+        # Final output - all details except analytics
         return {
             "ip": incident_result.ip,
+            "protocol": incident_result.protocol,
+            "poll_id": store_result.poll_id,
+            "total_interfaces": len(delta_result.deltas),
+            "deltas": delta_result.deltas,
             "incidents": incident_result.incidents,
             "total_incidents": len(incident_result.incidents)
         }
