@@ -1,5 +1,9 @@
 from datetime import timedelta
 from temporalio import workflow
+from temporalio.common import RetryPolicy
+
+# No retry policy - fail immediately on error
+NO_RETRY = RetryPolicy(maximum_attempts=1)
 
 with workflow.unsafe.imports_passed_through():
     from activities import (
@@ -45,6 +49,7 @@ class CrcErrorWorkflow:
             login_activity,
             LoginInput(ip=input.ip, protocol=input.protocol),
             start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=NO_RETRY,
         )
 
         # Step 2: Get physical interfaces (CRC errors, adminSt, node)
@@ -53,6 +58,7 @@ class CrcErrorWorkflow:
             get_phys_if_activity,
             PhysIfInput(ip=login_result.ip, protocol=login_result.protocol),
             start_to_close_timeout=timedelta(seconds=60),
+            retry_policy=NO_RETRY,
         )
 
         # Step 3: Get ingress totals (pktsCum)
@@ -65,6 +71,7 @@ class CrcErrorWorkflow:
                 protocol=phys_if_result.protocol,
             ),
             start_to_close_timeout=timedelta(seconds=60),
+            retry_policy=NO_RETRY,
         )
 
         # Step 4: Store history to MongoDB
@@ -77,6 +84,7 @@ class CrcErrorWorkflow:
                 protocol=ingr_total_result.protocol,
             ),
             start_to_close_timeout=timedelta(seconds=60),
+            retry_policy=NO_RETRY,
         )
 
         # Step 5: Calculate deltas between polls
@@ -89,6 +97,7 @@ class CrcErrorWorkflow:
                 protocol=store_result.protocol,
             ),
             start_to_close_timeout=timedelta(seconds=60),
+            retry_policy=NO_RETRY,
         )
 
         # Step 6: Evaluate incidents
@@ -101,6 +110,7 @@ class CrcErrorWorkflow:
                 protocol=delta_result.protocol,
             ),
             start_to_close_timeout=timedelta(seconds=60),
+            retry_policy=NO_RETRY,
         )
 
         # Final output - incidents only, no analytics
