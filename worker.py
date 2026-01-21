@@ -1,5 +1,4 @@
 import asyncio
-import os
 from temporalio.client import Client
 from temporalio.worker import Worker
 
@@ -12,12 +11,11 @@ from activities import (
     calculate_delta_activity,
     evaluate_incident_activity,
 )
-from props import TEMPORAL_QUEUE
+from props import TEMPORAL_QUEUE, TEMPORAL_HOST
 
 
 async def main():
-    temporal_host = os.environ.get("TEMPORAL_HOST", "localhost:7233")
-    client = await Client.connect(temporal_host)
+    client = await Client.connect(TEMPORAL_HOST)
 
     worker = Worker(
         client,

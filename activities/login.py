@@ -1,9 +1,9 @@
-import os
 from dataclasses import dataclass
 from temporalio import activity
 
 from .session import session
 from .logger import login_logger as logger
+from props import ACI_USERNAME, ACI_PASSWORD
 
 
 @dataclass
@@ -22,8 +22,8 @@ class LoginOutput:
 async def login_activity(input: LoginInput) -> LoginOutput:
     logger.info(f"Starting login activity for {input.ip}")
     url = f"{input.protocol}://{input.ip}/api/aaaLogin.json"
-    username = os.environ.get("ACI_USERNAME")
-    password = os.environ.get("ACI_PASSWORD")
+    username = ACI_USERNAME
+    password = ACI_PASSWORD
 
     logger.debug(f"Login URL: {url}")
     logger.debug(f"Username: {username}")
