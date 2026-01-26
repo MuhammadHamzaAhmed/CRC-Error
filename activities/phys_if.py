@@ -104,17 +104,21 @@ async def get_phys_if_activity(input: PhysIfInput) -> PhysIfOutput:
             rmon_attrs = rmon.get("attributes", {})
             crc_errors = int(rmon_attrs.get("cRCAlignErrors", 0))
 
-        interfaces[iface_id] = {
+        # Store interface nested under node to avoid duplicate interface names overwriting
+        # Structure: interfaces[node][iface_id] = {...}
+        if node not in interfaces:
+            interfaces[node] = {}
+        interfaces[node][iface_id] = {
             "dn": dn,
-            "node": node,
             "adminSt": admin_st,
             "crc_errors": crc_errors
         }
-        logger.debug(f"Interface {iface_id}: node={node}, adminSt={admin_st}, CRC errors={crc_errors}")
+        logger.debug(f"Interface {node}/{iface_id}: adminSt={admin_st}, CRC errors={crc_errors}")
 
     # Finalize analytics
     analytics.total_nodes = len(nodes_seen)
-    analytics.total_interfaces = len(interfaces)
+    # Count total interfaces across all nodes
+    analytics.total_interfaces = sum(len(ifaces) for ifaces in interfaces.values())
 
     # Log analytics summary
     logger.info("=" * 60)
@@ -138,7 +142,7 @@ async def get_phys_if_activity(input: PhysIfInput) -> PhysIfOutput:
         "empty_nodes": analytics.empty_nodes
     }
 
-    logger.info(f"Completed. Found {len(interfaces)} interfaces across {analytics.total_nodes} nodes")
+    logger.info(f"Completed. Found {analytics.total_interfaces} interfaces across {analytics.total_nodes} nodes")
 
     return PhysIfOutput(
         interfaces=interfaces,

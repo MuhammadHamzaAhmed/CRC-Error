@@ -67,7 +67,7 @@ async def calculate_delta_activity(input: DeltaInput) -> DeltaOutput:
     analytics.total_interfaces = len(current_poll)
     logger.info(f"Found {analytics.total_interfaces} interfaces in current poll")
 
-    # Calculate deltas for each interface
+    # Calculate deltas for each interface (nested by node)
     deltas = {}
 
     for current in current_poll:
@@ -75,15 +75,20 @@ async def calculate_delta_activity(input: DeltaInput) -> DeltaOutput:
         node = current.get("node", "")
         admin_st = current.get("adminSt", "unknown")
 
-        # Get previous poll for this interface (exclude current poll, get most recent)
+        # Get previous poll for this interface on same node (exclude current poll, get most recent)
         previous = collection.find_one(
             {
                 "ip": input.ip,
                 "interface_id": iface_id,
+                "node": node,  # Include node to match same interface on same node
                 "poll_id": {"$ne": input.poll_id}
             },
             sort=[("timestamp", -1)]
         )
+
+        # Initialize node in deltas if not present
+        if node not in deltas:
+            deltas[node] = {}
 
         if previous:
             analytics.interfaces_with_history += 1
@@ -111,8 +116,7 @@ async def calculate_delta_activity(input: DeltaInput) -> DeltaOutput:
             if delta_crc == 0 and delta_pkts == 0:
                 analytics.interfaces_with_zero_delta += 1
 
-            deltas[iface_id] = {
-                "node": node,
+            deltas[node][iface_id] = {
                 "dn": current.get("dn", ""),
                 "adminSt": admin_st,
                 "crc_t0": crc_t0,
@@ -125,16 +129,15 @@ async def calculate_delta_activity(input: DeltaInput) -> DeltaOutput:
             }
 
             logger.debug(
-                f"Interface {iface_id}: DELTA_CRC={delta_crc}, DELTA_PKTS={delta_pkts}, "
+                f"Interface {node}/{iface_id}: DELTA_CRC={delta_crc}, DELTA_PKTS={delta_pkts}, "
                 f"CRC_PERCENT={crc_percent:.6f}"
             )
         else:
             analytics.interfaces_without_history += 1
-            analytics.no_history_interfaces.append(iface_id)
+            analytics.no_history_interfaces.append(f"{node}/{iface_id}")
 
             # First poll - no delta available
-            deltas[iface_id] = {
-                "node": node,
+            deltas[node][iface_id] = {
                 "dn": current.get("dn", ""),
                 "adminSt": admin_st,
                 "crc_t0": None,
@@ -147,7 +150,7 @@ async def calculate_delta_activity(input: DeltaInput) -> DeltaOutput:
                 "first_poll": True
             }
 
-            logger.debug(f"Interface {iface_id}: First poll, no history available")
+            logger.debug(f"Interface {node}/{iface_id}: First poll, no history available")
 
     # Log analytics summary
     logger.info("=" * 60)
@@ -174,7 +177,8 @@ async def calculate_delta_activity(input: DeltaInput) -> DeltaOutput:
         "no_history_interfaces": analytics.no_history_interfaces
     }
 
-    logger.info(f"Completed. Calculated deltas for {len(deltas)} interfaces")
+    total_interfaces = sum(len(ifaces) for ifaces in deltas.values())
+    logger.info(f"Completed. Calculated deltas for {total_interfaces} interfaces across {len(deltas)} nodes")
 
     return DeltaOutput(
         deltas=deltas,

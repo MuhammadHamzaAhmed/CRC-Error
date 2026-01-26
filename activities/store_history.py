@@ -49,28 +49,30 @@ async def store_history_activity(input: StoreHistoryInput) -> StoreHistoryOutput
 
     # Analytics tracking
     analytics = StoreHistoryAnalytics()
-    analytics.total_interfaces = len(input.interfaces)
+    # Count total interfaces across all nodes
+    analytics.total_interfaces = sum(len(ifaces) for ifaces in input.interfaces.values())
 
     # Get MongoDB collection
     collection = get_history_collection()
     logger.info(f"Connected to MongoDB collection: {collection.name}")
 
-    # Prepare documents for insertion
+    # Prepare documents for insertion (iterate through nested node->interfaces structure)
     documents = []
-    for iface_id, iface_data in input.interfaces.items():
-        doc = {
-            "poll_id": poll_id,
-            "timestamp": timestamp,
-            "ip": input.ip,
-            "interface_id": iface_id,
-            "node": iface_data.get("node", ""),
-            "dn": iface_data.get("dn", ""),
-            "adminSt": iface_data.get("adminSt", "unknown"),
-            "crc_errors": iface_data.get("crc_errors", 0),
-            "pkts_cum": iface_data.get("pkts_cum", 0)
-        }
-        documents.append(doc)
-        logger.debug(f"Prepared document for interface {iface_id}: CRC={doc['crc_errors']}, PKTS={doc['pkts_cum']}")
+    for node, node_interfaces in input.interfaces.items():
+        for iface_id, iface_data in node_interfaces.items():
+            doc = {
+                "poll_id": poll_id,
+                "timestamp": timestamp,
+                "ip": input.ip,
+                "interface_id": iface_id,
+                "node": node,
+                "dn": iface_data.get("dn", ""),
+                "adminSt": iface_data.get("adminSt", "unknown"),
+                "crc_errors": iface_data.get("crc_errors", 0),
+                "pkts_cum": iface_data.get("pkts_cum", 0)
+            }
+            documents.append(doc)
+            logger.debug(f"Prepared document for interface {node}/{iface_id}: CRC={doc['crc_errors']}, PKTS={doc['pkts_cum']}")
 
     # Insert documents
     if documents:

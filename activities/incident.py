@@ -67,88 +67,90 @@ async def evaluate_incident_activity(input: IncidentInput) -> IncidentOutput:
 
     # Analytics tracking
     analytics = IncidentAnalytics()
-    analytics.total_interfaces = len(input.deltas)
+    # Count total interfaces across all nodes
+    analytics.total_interfaces = sum(len(ifaces) for ifaces in input.deltas.values())
 
     # Incidents list
     incidents = []
 
-    for iface_id, delta_data in input.deltas.items():
-        admin_st = delta_data.get("adminSt", "unknown")
-        delta_crc = delta_data.get("delta_crc")
-        delta_pkts = delta_data.get("delta_pkts")
-        crc_percent = delta_data.get("crc_percent")
-        first_poll = delta_data.get("first_poll", False)
-        node = delta_data.get("node", "")
-        dn = delta_data.get("dn", "")
+    # Iterate through nested node->interfaces structure
+    for node, node_interfaces in input.deltas.items():
+        for iface_id, delta_data in node_interfaces.items():
+            admin_st = delta_data.get("adminSt", "unknown")
+            delta_crc = delta_data.get("delta_crc")
+            delta_pkts = delta_data.get("delta_pkts")
+            crc_percent = delta_data.get("crc_percent")
+            first_poll = delta_data.get("first_poll", False)
+            dn = delta_data.get("dn", "")
 
-        logger.debug(f"Evaluating interface {iface_id}: adminSt={admin_st}, delta_crc={delta_crc}, "
-                     f"delta_pkts={delta_pkts}, crc_percent={crc_percent}")
+            logger.debug(f"Evaluating interface {node}/{iface_id}: adminSt={admin_st}, delta_crc={delta_crc}, "
+                         f"delta_pkts={delta_pkts}, crc_percent={crc_percent}")
 
-        # Skip if first poll (no history)
-        if first_poll:
-            analytics.interfaces_skipped_first_poll += 1
-            logger.debug(f"Interface {iface_id}: SKIPPED - First poll, no history")
-            continue
+            # Skip if first poll (no history)
+            if first_poll:
+                analytics.interfaces_skipped_first_poll += 1
+                logger.debug(f"Interface {node}/{iface_id}: SKIPPED - First poll, no history")
+                continue
 
-        # Rule: Ignore interfaces that are admin down
-        if admin_st != "up":
-            analytics.interfaces_skipped_admin_down += 1
-            analytics.skipped_admin_down_list.append(iface_id)
-            logger.debug(f"Interface {iface_id}: SKIPPED - adminSt={admin_st} (not up)")
-            continue
+            # Rule: Ignore interfaces that are admin down
+            if admin_st != "up":
+                analytics.interfaces_skipped_admin_down += 1
+                analytics.skipped_admin_down_list.append(f"{node}/{iface_id}")
+                logger.debug(f"Interface {node}/{iface_id}: SKIPPED - adminSt={admin_st} (not up)")
+                continue
 
-        # Rule: Ignore when delta values are None
-        if delta_crc is None or delta_pkts is None:
-            analytics.interfaces_skipped_no_delta += 1
-            logger.debug(f"Interface {iface_id}: SKIPPED - No delta values")
-            continue
+            # Rule: Ignore when delta values are None
+            if delta_crc is None or delta_pkts is None:
+                analytics.interfaces_skipped_no_delta += 1
+                logger.debug(f"Interface {node}/{iface_id}: SKIPPED - No delta values")
+                continue
 
-        # Rule: Ignore when DELTA_PKTS <= 0
-        if delta_pkts <= 0:
-            analytics.interfaces_skipped_zero_pkts += 1
-            logger.debug(f"Interface {iface_id}: SKIPPED - DELTA_PKTS={delta_pkts} <= 0")
-            continue
+            # Rule: Ignore when DELTA_PKTS <= 0
+            if delta_pkts <= 0:
+                analytics.interfaces_skipped_zero_pkts += 1
+                logger.debug(f"Interface {node}/{iface_id}: SKIPPED - DELTA_PKTS={delta_pkts} <= 0")
+                continue
 
-        # Interface is eligible for evaluation
-        analytics.interfaces_evaluated += 1
+            # Interface is eligible for evaluation
+            analytics.interfaces_evaluated += 1
 
-        # Rule: IF CRC_PERCENT > 0.01 THEN OPEN INCIDENT
-        if crc_percent is not None and crc_percent > CRC_THRESHOLD:
-            analytics.incidents_opened += 1
+            # Rule: IF CRC_PERCENT > 0.01 THEN OPEN INCIDENT
+            if crc_percent is not None and crc_percent > CRC_THRESHOLD:
+                analytics.incidents_opened += 1
 
-            # Determine severity based on CRC percentage
-            if crc_percent > 0.10:  # > 10%
-                severity = "critical"
-            elif crc_percent > 0.05:  # > 5%
-                severity = "high"
-            elif crc_percent > 0.02:  # > 2%
-                severity = "medium"
+                # Determine severity based on CRC percentage
+                if crc_percent > 0.10:  # > 10%
+                    severity = "critical"
+                elif crc_percent > 0.05:  # > 5%
+                    severity = "high"
+                elif crc_percent > 0.02:  # > 2%
+                    severity = "medium"
+                else:
+                    severity = "warning"
+
+                incident = {
+                    "interface_id": iface_id,
+                    "node": node,
+                    "dn": dn,
+                    "delta_crc": delta_crc,
+                    "delta_pkts": delta_pkts,
+                    "crc_percent": crc_percent,
+                    "crc_percent_display": f"{crc_percent * 100:.2f}%",
+                    "severity": severity
+                }
+                incidents.append(incident)
+
+                logger.warning(
+                    f"INCIDENT OPENED - Interface {node}/{iface_id}: "
+                    f"CRC_PERCENT={crc_percent * 100:.2f}% > {CRC_THRESHOLD * 100}% threshold, "
+                    f"severity={severity}"
+                )
             else:
-                severity = "warning"
-
-            incident = {
-                "interface_id": iface_id,
-                "node": node,
-                "dn": dn,
-                "delta_crc": delta_crc,
-                "delta_pkts": delta_pkts,
-                "crc_percent": crc_percent,
-                "crc_percent_display": f"{crc_percent * 100:.2f}%",
-                "severity": severity
-            }
-            incidents.append(incident)
-
-            logger.warning(
-                f"INCIDENT OPENED - Interface {iface_id}: "
-                f"CRC_PERCENT={crc_percent * 100:.2f}% > {CRC_THRESHOLD * 100}% threshold, "
-                f"severity={severity}"
-            )
-        else:
-            analytics.incidents_ignored += 1
-            logger.debug(
-                f"Interface {iface_id}: NO INCIDENT - CRC_PERCENT={crc_percent * 100:.4f}% <= "
-                f"{CRC_THRESHOLD * 100}% threshold"
-            )
+                analytics.incidents_ignored += 1
+                logger.debug(
+                    f"Interface {node}/{iface_id}: NO INCIDENT - CRC_PERCENT={crc_percent * 100:.4f}% <= "
+                    f"{CRC_THRESHOLD * 100}% threshold"
+                )
 
     # Log analytics summary
     logger.info("=" * 60)
