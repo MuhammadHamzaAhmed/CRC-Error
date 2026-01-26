@@ -114,11 +114,13 @@ class CrcErrorWorkflow:
         )
 
         # Final output - all details except analytics
+        # Count total interfaces across all nodes in nested structure
+        total_interfaces = sum(len(ifaces) for ifaces in delta_result.deltas.values())
         return {
             "ip": incident_result.ip,
             "protocol": incident_result.protocol,
             "poll_id": store_result.poll_id,
-            "total_interfaces": len(delta_result.deltas),
+            "total_interfaces": total_interfaces,
             "deltas": delta_result.deltas,
             "incidents": incident_result.incidents,
             "total_incidents": len(incident_result.incidents)

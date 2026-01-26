@@ -46,6 +46,18 @@ def extract_interface_from_dn(dn: str) -> str:
     return ""
 
 
+def extract_node_from_dn(dn: str) -> str:
+    """
+    Extract node identifier from DN string.
+    Example DN: topology/pod-2/node-2212/sys/phys-[eth1/33]/CDeqptIngrTotal15min
+    Returns: node-2212 or empty string if not found
+    """
+    match = re.search(r'(node-\d+)', dn)
+    if match:
+        return match.group(1)
+    return ""
+
+
 @activity.defn
 async def get_ingr_total_activity(input: IngrTotalInput) -> IngrTotalOutput:
     logger.info(f"Starting ingress total activity for {input.ip}")
@@ -75,40 +87,48 @@ async def get_ingr_total_activity(input: IngrTotalInput) -> IngrTotalOutput:
         attrs = ingr.get("attributes", {})
         dn = attrs.get("dn", "")
 
-        # Extract interface from DN
+        # Extract interface and node from DN
         iface = extract_interface_from_dn(dn)
+        node = extract_node_from_dn(dn)
 
-        if iface:
+        if iface and node:
             # Extract pktsCum as the main packet counter
             pkts_cum = attrs.get("pktsCum", "0")
 
-            ingr_data[iface] = {
+            # Store nested by node to match phys_if structure
+            if node not in ingr_data:
+                ingr_data[node] = {}
+            ingr_data[node][iface] = {
                 "pkts_cum": int(pkts_cum),
                 "dn": dn
             }
-            logger.debug(f"Interface {iface}: pktsCum={pkts_cum}")
+            logger.debug(f"Interface {node}/{iface}: pktsCum={pkts_cum}")
         else:
             # Generate UUID for tracking empty interface extraction
             empty_uuid = str(uuid.uuid4())
             analytics.empty_interface_extractions.append(empty_uuid)
-            logger.warning(f"Failed to extract interface from DN: {dn} (tracking UUID: {empty_uuid})")
+            logger.warning(f"Failed to extract interface/node from DN: {dn} (tracking UUID: {empty_uuid})")
 
-    # Merge with input interfaces
+    # Merge with input interfaces (nested by node)
     result = {}
-    for iface_id, iface_data in input.interfaces.items():
-        result[iface_id] = iface_data.copy()
+    for node, node_interfaces in input.interfaces.items():
+        if node not in result:
+            result[node] = {}
+        for iface_id, iface_data in node_interfaces.items():
+            result[node][iface_id] = iface_data.copy()
 
-        if iface_id in ingr_data:
-            result[iface_id]["pkts_cum"] = ingr_data[iface_id]["pkts_cum"]
-            analytics.total_interfaces_matched += 1
-            analytics.interfaces_with_pkts += 1
-            logger.debug(f"Matched interface {iface_id}: pktsCum={ingr_data[iface_id]['pkts_cum']}")
-        else:
-            # No matching ingress data - set pkts_cum to 0
-            result[iface_id]["pkts_cum"] = 0
-            analytics.total_interfaces_unmatched += 1
-            analytics.interfaces_without_pkts += 1
-            logger.debug(f"No ingress data for interface {iface_id}, setting pktsCum=0")
+            # Check if we have ingress data for this node/interface
+            if node in ingr_data and iface_id in ingr_data[node]:
+                result[node][iface_id]["pkts_cum"] = ingr_data[node][iface_id]["pkts_cum"]
+                analytics.total_interfaces_matched += 1
+                analytics.interfaces_with_pkts += 1
+                logger.debug(f"Matched interface {node}/{iface_id}: pktsCum={ingr_data[node][iface_id]['pkts_cum']}")
+            else:
+                # No matching ingress data - set pkts_cum to 0
+                result[node][iface_id]["pkts_cum"] = 0
+                analytics.total_interfaces_unmatched += 1
+                analytics.interfaces_without_pkts += 1
+                logger.debug(f"No ingress data for interface {node}/{iface_id}, setting pktsCum=0")
 
     # Log analytics summary
     logger.info("=" * 60)
@@ -134,7 +154,8 @@ async def get_ingr_total_activity(input: IngrTotalInput) -> IngrTotalOutput:
         "empty_interface_extractions": analytics.empty_interface_extractions
     }
 
-    logger.info(f"Completed. Merged data for {len(result)} interfaces")
+    total_interfaces = sum(len(ifaces) for ifaces in result.values())
+    logger.info(f"Completed. Merged data for {total_interfaces} interfaces across {len(result)} nodes")
 
     return IngrTotalOutput(
         interfaces=result,
