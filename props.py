@@ -15,6 +15,13 @@ MONGO_DB = os.environ.get("MONGO_DB", "crc_error")
 # Timezone configuration (default: Saudi Arabia Riyadh)
 TZ = os.environ.get("TZ", "Asia/Riyadh")
 
-# ACI credentials
-ACI_USERNAME = os.environ.get("ACI_USERNAME")
-ACI_PASSWORD = os.environ.get("ACI_PASSWORD")
+# SMTP Email configuration (no authentication required)
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtpdr.alrajhi.bank")
+SMTP_IP = os.environ.get("SMTP_IP", "10.242.252.46")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "25"))
+EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "itopalert@alrajhi.bank")
+
+# Recipient list for incident notifications
+EMAIL_RECIPIENTS = [
+    "MuAhmed@alrajhibank.com.sa",
+]

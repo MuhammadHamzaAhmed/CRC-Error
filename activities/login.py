@@ -3,7 +3,7 @@ from temporalio import activity
 
 from .session import session
 from .logger import login_logger as logger
-from props import ACI_USERNAME, ACI_PASSWORD
+from device_credentials import DeviceCredentials
 
 
 @dataclass
@@ -22,8 +22,9 @@ class LoginOutput:
 async def login_activity(input: LoginInput) -> LoginOutput:
     logger.info(f"Starting login activity for {input.ip}")
     url = f"{input.protocol}://{input.ip}/api/aaaLogin.json"
-    username = ACI_USERNAME
-    password = ACI_PASSWORD
+    credentials = DeviceCredentials()
+    username = credentials.username
+    password = credentials.password
 
     logger.debug(f"Login URL: {url}")
     logger.debug(f"Username: {username}")

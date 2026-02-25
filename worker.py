@@ -10,6 +10,7 @@ from activities import (
     store_history_activity,
     calculate_delta_activity,
     evaluate_incident_activity,
+    send_email_notification_activity,
 )
 from props import TEMPORAL_QUEUE, TEMPORAL_HOST
 
@@ -28,6 +29,7 @@ async def main():
             store_history_activity,
             calculate_delta_activity,
             evaluate_incident_activity,
+            send_email_notification_activity,
         ],
     )
 

@@ -20,7 +20,7 @@ services:
       retries: 5
 
   crc-worker:
-    build: .
+    build: ..
     command: python worker.py
     volumes:
       - .:/usr/src/app

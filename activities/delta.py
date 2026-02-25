@@ -162,8 +162,8 @@ async def calculate_delta_activity(input: DeltaInput) -> DeltaOutput:
     logger.info(f"Interfaces with positive DELTA_CRC: {analytics.interfaces_with_positive_delta_crc}")
     logger.info(f"Interfaces with positive DELTA_PKTS: {analytics.interfaces_with_positive_delta_pkts}")
     logger.info(f"Interfaces with zero delta: {analytics.interfaces_with_zero_delta}")
-    if analytics.no_history_interfaces:
-        logger.info(f"No history interfaces: {analytics.no_history_interfaces}")
+    # if analytics.no_history_interfaces:
+    #     logger.info(f"No history interfaces: {analytics.no_history_interfaces}")
     logger.info("=" * 60)
 
     # Convert analytics to dict

@@ -13,12 +13,14 @@ with workflow.unsafe.imports_passed_through():
         store_history_activity,
         calculate_delta_activity,
         evaluate_incident_activity,
+        send_email_notification_activity,
         LoginInput,
         PhysIfInput,
         IngrTotalInput,
         StoreHistoryInput,
         DeltaInput,
         IncidentInput,
+        EmailInput,
         WorkflowInput,
     )
 
@@ -96,7 +98,7 @@ class CrcErrorWorkflow:
                 poll_id=store_result.poll_id,
                 protocol=store_result.protocol,
             ),
-            start_to_close_timeout=timedelta(seconds=60),
+            start_to_close_timeout=timedelta(minutes=30),
             retry_policy=NO_RETRY,
         )
 
@@ -113,9 +115,24 @@ class CrcErrorWorkflow:
             retry_policy=NO_RETRY,
         )
 
-        # Final output - all details except analytics
         # Count total interfaces across all nodes in nested structure
         total_interfaces = sum(len(ifaces) for ifaces in delta_result.deltas.values())
+
+        # Step 7: Send email notification if incidents found
+        email_result = await workflow.execute_activity(
+            send_email_notification_activity,
+            EmailInput(
+                ip=incident_result.ip,
+                protocol=incident_result.protocol,
+                poll_id=store_result.poll_id,
+                incidents=incident_result.incidents,
+                total_interfaces=total_interfaces,
+            ),
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=NO_RETRY,
+        )
+
+        # Final output - all details except analytics
         return {
             "ip": incident_result.ip,
             "protocol": incident_result.protocol,
@@ -123,5 +140,7 @@ class CrcErrorWorkflow:
             "total_interfaces": total_interfaces,
             "deltas": delta_result.deltas,
             "incidents": incident_result.incidents,
-            "total_incidents": len(incident_result.incidents)
+            "total_incidents": len(incident_result.incidents),
+            "email_sent": email_result.emails_sent,
+            "email_failed": email_result.emails_failed,
         }
